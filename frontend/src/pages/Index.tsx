@@ -1,5 +1,4 @@
 import { Header } from "@/components/Header";
-import { HeroSection } from "@/components/HeroSection";
 import { ResourceCategories } from "@/components/ResourceCategories";
 import { MapSection } from "@/components/MapSection";
 import { CommunitySection } from "@/components/CommunitySection";
