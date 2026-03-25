@@ -156,10 +156,7 @@ export const MapSection = () => {
                     Find nearby shelters
                   </Button>
 
-                  <Button variant="outline" className="w-full justify-start">
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Get directions
-                  </Button>
+                  
                 </div>
               </Card>
 
@@ -174,15 +171,7 @@ export const MapSection = () => {
                     <Zap className="h-4 w-4 mr-2" />
                     Report Resource
                   </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start"
-                  >
-                    <ScanLine className="h-4 w-4 mr-2" />
-                    Verify Location
-                  </Button>
+                    
                 </div>
               </Card>
             </div>

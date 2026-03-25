@@ -9,7 +9,7 @@ app = Flask(__name__)
 # --- SETUP ---
 # 🛑 PASTE YOUR OPENWEATHERMAP API KEY HERE
 WEATHER_API_KEY = "7309e32cfd5f9a1dc4e22ebdbccdf1e6"
-NODE_BACKEND_URL = "http://localhost:3000/api/alerts/receive-ai"
+NODE_BACKEND_URL = "http://localhost:5000/api/alerts/receive-ai"
 
 # --- LOAD MODELS ---
 base_path = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +29,8 @@ def get_real_time_features(lat, lon):
             return np.array([5.0] * 20).reshape(1, -1)
         
         # Extract live rainfall in the last hour (defaults to 0 if no rain)
-        rainfall = data.get('rain', {}).get('1h', 0)
+        # rainfall = data.get('rain', {}).get('1h', 0)
+        rainfall = 500.0
         
         # Map rainfall to 'MonsoonIntensity' (your first feature)
         monsoon_intensity = min(rainfall * 2, 20) 
@@ -61,6 +62,8 @@ def predict():
 
     # 2. Check if Risk is HIGH (Threshold > 0.7)
     if f_prob > 0.7 or e_risk == 1:
+    # f_prob = 0.99
+    # if True:
         disaster_type = "flood" if f_prob > 0.7 else "earthquake"
         
         alert_payload = {

@@ -31,6 +31,7 @@ const Login = () => {
                 // Save Token and User Info
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("userId", data.user.id);
+                localStorage.setItem("userRole", data.user.role);
                 if(data.user && data.user.name) {
                     localStorage.setItem("userName", data.user.name);
                 }

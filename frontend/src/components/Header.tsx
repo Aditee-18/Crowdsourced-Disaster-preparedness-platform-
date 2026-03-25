@@ -1,17 +1,25 @@
-import { Shield, AlertTriangle, Users, Menu, User, Moon, Sun } from "lucide-react";
+import { Shield, AlertTriangle, Users, Menu, User, Moon, Sun, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 export const Header = () => {
     const navigate = useNavigate();
     const [theme, setTheme] = useState<"light" | "dark">("light");
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
+        // Theme initialization
         const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
         if (savedTheme) {
             setTheme(savedTheme);
             document.documentElement.classList.toggle("dark", savedTheme === "dark");
+        }
+
+        // --- CORRECTED ADMIN CHECK ---
+        const userRole = localStorage.getItem("userRole"); 
+        if (userRole === 'admin') {
+            setIsAdmin(true);
         }
     }, []);
 
@@ -27,7 +35,7 @@ export const Header = () => {
             <div className="container mx-auto px-4 py-4">
                 <div className="flex items-center justify-between">
                     {/* Logo and Title */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
                         <div className="flex items-center justify-center w-10 h-10 bg-gradient-hero rounded-lg shadow-glow">
                             <Shield className="h-6 w-6 text-white" />
                         </div>
@@ -39,18 +47,32 @@ export const Header = () => {
 
                     {/* Navigation */}
                     <nav className="hidden md:flex items-center gap-6">
-                        <a href="#resources" className="text-foreground hover:text-primary transition-colors">
-                            Resources
-                        </a>
                         <a href="#map" className="text-foreground hover:text-primary transition-colors">
                             Map
-                        </a>
-                        <a href="#community" className="text-foreground hover:text-primary transition-colors">
-                            Community
                         </a>
                         <a href="#alerts" className="text-foreground hover:text-primary transition-colors">
                             Alerts
                         </a>
+                        <a href="#community" className="text-foreground hover:text-primary transition-colors">
+                            Community
+                        </a>
+                        <a href="#resources" className="text-foreground hover:text-primary transition-colors">
+                            Resources
+                        </a>
+                        
+                        
+                        
+
+                        {/* --- ADMIN LINK --- */}
+                        {isAdmin && (
+                            <Link 
+                                to="/admin/alerts" 
+                                className="flex items-center gap-1.5 text-destructive font-semibold hover:text-destructive/80 transition-colors bg-destructive/10 px-3 py-1.5 rounded-md"
+                            >
+                                <ShieldAlert className="h-4 w-4" />
+                                Admin Panel
+                            </Link>
+                        )}
                     </nav>
 
                     {/* Action Buttons */}
@@ -68,7 +90,7 @@ export const Header = () => {
                             )}
                         </Button>
                         <Button variant="emergency" size="sm" className="hidden sm:flex">
-                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTriangle className="h-4 w-4 mr-2" />
                             Report Emergency
                         </Button>
                         <Button
