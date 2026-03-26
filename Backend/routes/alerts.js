@@ -1,103 +1,116 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // Pulling in your custom db.js
+const db = require('../db'); 
+const twilio = require('twilio');
 
-// 1. RECEIVE FROM AI SERVER
+// Initialize Twilio
+const client = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// 1. RECEIVE FROM AI SERVER (Automated)
 router.post('/receive-ai', async (req, res) => {
     try {
         const { disaster_type, risk_level, latitude, longitude, confidence, message } = req.body;
         
-        // REVERSE GEOCODING WITH NOMINATIM ---
         let placeName = "an unknown location";
         try {
-            // Ask Nominatim what is at these coordinates
-            //  Nominatim REQUIRES a User-Agent header, or they will block the request!
             const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
                 headers: { 'User-Agent': 'SafetyNet-Disaster-App/1.0' }
             });
             const geoData = await geoRes.json();
-            
             if (geoData && geoData.address) {
-                // Trying to grab the most relevant local name (city, town, village, or state)
-                placeName = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.county || geoData.address.state || "the area";
+                placeName = geoData.address.city || geoData.address.town || geoData.address.village || "the area";
             }
         } catch (geoError) {
-            console.error("⚠️ Could not fetch place name from Nominatim:", geoError.message);
+            console.error("⚠️ Nominatim Error:", geoError.message);
         }
 
-        // Enhance the original AI message to include the real place name
         const enhancedMessage = `[Location: ${placeName}] ${message}`;
 
-        // Save to database
         const query = `
             INSERT INTO alerts (disaster_type, risk_level, latitude, longitude, confidence, message, status)
             VALUES ($1, $2, $3, $4, $5, $6, 'pending')
             RETURNING id;
         `;
-        const values = [disaster_type, risk_level, latitude, longitude, confidence, enhancedMessage];
-        
-        const result = await db.query(query, values);
+        const result = await db.query(query, [disaster_type, risk_level, latitude, longitude, confidence, enhancedMessage]);
 
-        console.log(`⚠️ New AI Prediction received: ${disaster_type} near ${placeName} (${latitude}, ${longitude})`);
         res.status(201).json({ success: true, alertId: result.rows[0].id });
     } catch (error) {
-        console.error("Error saving AI alert:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// 2. GET ALL PENDING ALERTS (For Admin Dashboard)
+// 2. CITIZEN MANUAL REPORT (From Frontend Modal)
+router.post('/report', async (req, res) => {
+    const { disaster_type, description, latitude, longitude } = req.body;
+    try {
+        const query = `
+            INSERT INTO alerts (disaster_type, message, latitude, longitude, status)
+            VALUES ($1, $2, $3, $4, 'pending')
+            RETURNING id;
+        `;
+        const result = await db.query(query, [disaster_type, description, latitude, longitude]);
+        res.status(201).json({ success: true, alertId: result.rows[0].id });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to save report" });
+    }
+});
+
+// 3. ADMIN APPROVE & BROADCAST (The Twilio Trigger)
+router.post('/approve/:id', async (req, res) => {
+    const alertId = req.params.id;
+    try {
+        const alertRes = await db.query("SELECT * FROM alerts WHERE id = $1", [alertId]);
+        if (alertRes.rows.length === 0) return res.status(404).json({ error: "Alert not found" });
+        const alert = alertRes.rows[0];
+
+        // 1. Find users within 50km
+        const userQuery = `
+            SELECT phone_number FROM users 
+            WHERE (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) <= 50
+        `;
+        const users = await db.query(userQuery, [alert.latitude, alert.longitude]);
+
+        // 2. Find 5 Nearby Resources
+        const resQuery = `SELECT name FROM resources LIMIT 5`;
+        const resources = await db.query(resQuery);
+        const resourceList = resources.rows.map(r => r.name).join(", ");
+
+        // 3. Send SMS via Twilio
+        const messageBody = `🚨 ALERT: ${alert.disaster_type}! ${alert.message}. Nearby help: ${resourceList || 'Check App'}`;
+        
+        const smsPromises = users.rows.map(user => {
+            return client.messages.create({
+                body: messageBody,
+                from: process.env.TWILIO_PHONE,
+                to: user.phone_number
+            });
+        });
+        await Promise.all(smsPromises);
+
+        // 4. Update status
+        await db.query("UPDATE alerts SET status = 'approved' WHERE id = $1", [alertId]);
+
+        res.json({ success: true, message: `Alert sent to ${users.rows.length} users.` });
+    } catch (err) {
+        console.error("Broadcast Error:", err);
+        res.status(500).json({ error: "Failed to broadcast alert" });
+    }
+});
+
+// 4. GET PENDING (For Admin Dashboard)
 router.get('/pending', async (req, res) => {
     try {
-        const query = `SELECT * FROM alerts WHERE status = 'pending' ORDER BY id DESC`;
-        const result = await db.query(query);
+        const result = await db.query("SELECT * FROM alerts WHERE status = 'pending' ORDER BY id DESC");
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 3. ADMIN APPROVE & BROADCAST
-router.post('/approve/:id', async (req, res) => {
-    try {
-        const alertId = req.params.id;
-
-        // Update the status to approved
-        const updateQuery = `
-            UPDATE alerts 
-            SET status = 'approved' 
-            WHERE id = $1 
-            RETURNING *;
-        `;
-        const result = await db.query(updateQuery, [alertId]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).send("Alert not found");
-        }
-
-        const approvedAlert = result.rows[0];
-
-        // --- TWILIO LOGIC---
-        // fetch all users around the disaster coordinates from the users table here 
-        // and loop through to send SMS
-        console.log(`📢 BROADCASTING: ${approvedAlert.message} to all users!`);
-
-        res.json({ message: "Alert approved and broadcasted!" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-// GET ACTIVE/APPROVED ALERTS FOR THE PUBLIC
+// 5. GET ACTIVE (For Map Display)
 router.get('/active', async (req, res) => {
     try {
-        // Fetch alerts that the Admin has approved
-        const query = `
-            SELECT * FROM alerts 
-            WHERE status = 'approved' 
-            ORDER BY created_at DESC 
-            LIMIT 5;
-        `;
-        const result = await db.query(query);
+        const result = await db.query("SELECT * FROM alerts WHERE status = 'approved' ORDER BY id DESC LIMIT 5");
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
