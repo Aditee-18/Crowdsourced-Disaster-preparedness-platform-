@@ -89,10 +89,7 @@ export const Header = () => {
                                 <Sun className="h-5 w-5" />
                             )}
                         </Button>
-                        <Button variant="emergency" size="sm" className="hidden sm:flex">
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Report Emergency
-                        </Button>
+                
                         <Button
                             variant="outline"
                             size="sm"

@@ -1,15 +1,12 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AddResource from "./AddResource";
-import ReportEmergency from "./ReportEmergency"; // 1. IMPORT THIS
+import ReportEmergency from "./ReportEmergency";
 
 import {
-  Search,
-  Navigation,
   Zap,
-  ScanLine,
-  AlertTriangle, // 2. ADD THIS ICON
-  X              // 2. ADD THIS ICON
+  AlertTriangle,
+  X 
 } from "lucide-react";
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -18,9 +15,8 @@ import { useEffect, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import "./MapStyles.css";
 
-// Fix leaflet default icon bug in vite
+// Fix leaflet default icon bug
 delete (L.Icon.Default.prototype as any)._getIconUrl;
-
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -58,23 +54,17 @@ const userLocationIcon = L.divIcon({
 export const MapSection = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [showModal, setShowModal] = useState(false);
-  
-  // 3. NEW STATES FOR EMERGENCY AND SELECTION
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-
   const [userLocation, setUserLocation] = useState<[number, number]>([28.6139, 77.209]);
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation([latitude, longitude]);
+          setUserLocation([position.coords.latitude, position.coords.longitude]);
         },
-        (error) => {
-          console.error("Error getting user location:", error);
-        }
+        (error) => console.error("Error getting user location:", error)
       );
     }
   }, []);
@@ -137,26 +127,21 @@ export const MapSection = () => {
                         <Marker 
                           key={res.id} 
                           position={[lat, lng]}
-                          eventHandlers={{
-                            click: () => setSelectedResource(res), // 4. HANDLE CLICK
-                          }}
+                          eventHandlers={{ click: () => setSelectedResource(res) }}
                         >
                           <Popup>
-                            <strong>{res.name}</strong>
-                            <br />
-                            {res.type}
+                            <strong>{res.name}</strong><br />{res.type}
                           </Popup>
                         </Marker>
                       );
                     })}
                   </MapContainer>
 
-                  {/* 5. RESOURCE DETAILS OVERLAY (Appears inside the map area) */}
                   {selectedResource && (
                     <div className="absolute bottom-4 left-4 z-[1000] w-72 animate-in slide-in-from-bottom-5">
                       <Card className="p-4 shadow-2xl border-l-4 border-blue-600 bg-white/95 backdrop-blur-sm">
                         <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-lg">{selectedResource.name}</h3>
+                          <h3 className="font-bold bg-white text-black">{selectedResource.name}</h3>
                           <button onClick={() => setSelectedResource(null)} className="text-gray-400 hover:text-black">
                             <X className="h-4 w-4" />
                           </button>
@@ -187,7 +172,6 @@ export const MapSection = () => {
                     Report Resource
                   </Button>
                   
-                  {/* 6. ADD THE RED EMERGENCY BUTTON */}
                   <Button
                     size="sm"
                     variant="destructive"
@@ -210,7 +194,6 @@ export const MapSection = () => {
         onSubmit={handleResourceSubmit}
       />
 
-      {/* 7. ADD THE EMERGENCY MODAL */}
       <ReportEmergency 
         isOpen={showEmergencyModal} 
         onClose={() => setShowEmergencyModal(false)} 
