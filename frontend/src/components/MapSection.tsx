@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AddResource from "./AddResource";
+
 import {
   Search,
   Navigation,
@@ -12,8 +13,9 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { useEffect, useState } from "react";
-
 import "leaflet/dist/leaflet.css";
+import "./MapStyles.css";
+
 
 // Fix leaflet default icon bug in vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,6 +28,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png"
 });
+
+
 
 interface Resource {
   id: number;
@@ -49,6 +53,12 @@ const RecenterMap = ({ lat, lng }: { lat: number; lng: number }) => {
   return null;
 };
 
+const userLocationIcon = L.divIcon({
+  className: 'custom-location-marker',
+  html: '<div class="my-red-dot"></div>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+});
 export const MapSection = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -125,8 +135,8 @@ export const MapSection = () => {
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
                     {/* Optional: Add a special marker for "You are Here" */}
-                    <Marker position={userLocation}>
-                       <Popup>You are here</Popup>
+                    <Marker position={userLocation} icon={userLocationIcon}>
+                       <Popup >You are here</Popup>
                     </Marker>
 
                     {resources.map((res) => {
@@ -148,7 +158,7 @@ export const MapSection = () => {
             </div>
 
             <div className="space-y-6">
-              <Card className="p-4">
+              {/* <Card className="p-4">
                 <h4 className="font-semibold mb-3">Search Resources</h4>
                 <div className="space-y-3">
                   <Button variant="outline" className="w-full justify-start">
@@ -158,7 +168,7 @@ export const MapSection = () => {
 
                   
                 </div>
-              </Card>
+              </Card> */}
 
               <Card className="p-4">
                 <h4 className="font-semibold mb-3">Quick Actions</h4>
