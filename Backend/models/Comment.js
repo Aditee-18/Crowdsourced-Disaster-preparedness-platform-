@@ -42,9 +42,7 @@ class Comment {
     return rows;
   }
 
-  // Add this inside class Comment
-
-  // 3️⃣ Get All Recent Comments (For the Live Feed)
+  // Get All Recent Comments (For the Live Feed)
   static async findRecent() {
     const sql = `
       SELECT 

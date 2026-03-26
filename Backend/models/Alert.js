@@ -1,6 +1,5 @@
 const db = require('../db'); 
 
-// This function creates the table if it doesn't already exist
 const createAlertTable = async () => {
     const query = `
         CREATE TABLE IF NOT EXISTS alerts (

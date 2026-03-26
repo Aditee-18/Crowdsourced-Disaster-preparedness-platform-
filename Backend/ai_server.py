@@ -6,12 +6,12 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# --- SETUP ---
-# 🛑 PASTE YOUR OPENWEATHERMAP API KEY HERE
+# SETUP 
+# PASTE OPENWEATHERMAP API KEY HERE
 WEATHER_API_KEY = "7309e32cfd5f9a1dc4e22ebdbccdf1e6"
 NODE_BACKEND_URL = "http://localhost:5000/api/alerts/receive-ai"
 
-# --- LOAD MODELS ---
+# LOAD MODELS
 base_path = os.path.dirname(os.path.abspath(__file__))
 flood_model = joblib.load(os.path.join(base_path, 'ai_models', 'flood_model_final.pkl'))
 eq_model = joblib.load(os.path.join(base_path, 'ai_models', 'earthquake_model_final.pkl'))
@@ -29,8 +29,8 @@ def get_real_time_features(lat, lon):
             return np.array([5.0] * 20).reshape(1, -1)
         
         # Extract live rainfall in the last hour (defaults to 0 if no rain)
-        # rainfall = data.get('rain', {}).get('1h', 0)
-        rainfall = 500.0
+        rainfall = data.get('rain', {}).get('1h', 0)
+        # rainfall = 500.0  #for the fake pred
         
         # Map rainfall to 'MonsoonIntensity' (your first feature)
         monsoon_intensity = min(rainfall * 2, 20) 

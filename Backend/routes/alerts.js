@@ -7,18 +7,18 @@ router.post('/receive-ai', async (req, res) => {
     try {
         const { disaster_type, risk_level, latitude, longitude, confidence, message } = req.body;
         
-        // --- NEW: REVERSE GEOCODING WITH NOMINATIM ---
+        // REVERSE GEOCODING WITH NOMINATIM ---
         let placeName = "an unknown location";
         try {
             // Ask Nominatim what is at these coordinates
-            // Note: Nominatim REQUIRES a User-Agent header, or they will block your request!
+            //  Nominatim REQUIRES a User-Agent header, or they will block the request!
             const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
                 headers: { 'User-Agent': 'SafetyNet-Disaster-App/1.0' }
             });
             const geoData = await geoRes.json();
             
             if (geoData && geoData.address) {
-                // Try to grab the most relevant local name (city, town, village, or state)
+                // Trying to grab the most relevant local name (city, town, village, or state)
                 placeName = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.county || geoData.address.state || "the area";
             }
         } catch (geoError) {
@@ -77,8 +77,8 @@ router.post('/approve/:id', async (req, res) => {
 
         const approvedAlert = result.rows[0];
 
-        // --- TWILIO LOGIC HERE ---
-        // You would fetch all users from the users table here 
+        // --- TWILIO LOGIC---
+        // fetch all users around the disaster coordinates from the users table here 
         // and loop through to send SMS
         console.log(`📢 BROADCASTING: ${approvedAlert.message} to all users!`);
 
