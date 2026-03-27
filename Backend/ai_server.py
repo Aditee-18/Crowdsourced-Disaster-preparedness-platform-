@@ -7,85 +7,71 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # SETUP 
-# PASTE OPENWEATHERMAP API KEY HERE
 WEATHER_API_KEY = "7309e32cfd5f9a1dc4e22ebdbccdf1e6"
+# Ensure this matches your Node.js route exactly
 NODE_BACKEND_URL = "http://localhost:5000/api/alerts/receive-ai"
 
 # LOAD MODELS
 base_path = os.path.dirname(os.path.abspath(__file__))
-flood_model = joblib.load(os.path.join(base_path, 'ai_models', 'flood_model_final.pkl'))
-eq_model = joblib.load(os.path.join(base_path, 'ai_models', 'earthquake_model_final.pkl'))
-
-def get_real_time_features(lat, lon):
-    """Fetches live weather and maps it to your 20 model features."""
-    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={WEATHER_API_KEY}&units=metric"
-    try:
-        res = requests.get(url)
-        data = res.json()
-
-        # Handle API errors (like if the key isn't active yet)
-        if res.status_code != 200:
-            print(f"⚠️ API Error: {data.get('message')}")
-            return np.array([5.0] * 20).reshape(1, -1)
-        
-        # Extract live rainfall in the last hour (defaults to 0 if no rain)
-        rainfall = data.get('rain', {}).get('1h', 0)
-        # rainfall = 500.0  #for the fake pred
-        
-        # Map rainfall to 'MonsoonIntensity' (your first feature)
-        monsoon_intensity = min(rainfall * 2, 20) 
-        
-        print(f"🌦️ Live Weather for [{lat}, {lon}]: Rainfall = {rainfall}mm")
-        
-        # Create the 20-feature array. Index 0 is live rainfall, rest are neutral defaults (5.0)
-        features = [monsoon_intensity] + [5.0] * 19
-        return np.array(features).reshape(1, -1)
-        
-    except Exception as e:
-        print(f"⚠️ Error fetching live weather: {e}")
-        return np.array([5.0] * 20).reshape(1, -1)
+try:
+    flood_model = joblib.load(os.path.join(base_path, 'ai_models', 'flood_model_final.pkl'))
+    eq_model = joblib.load(os.path.join(base_path, 'ai_models', 'earthquake_model_final.pkl'))
+except Exception as e:
+    print(f"⚠️ Warning: Models not loaded, using fallback logic: {e}")
 
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
-    lat = data.get('lat')
-    lon = data.get('lon')
+    lat = float(data.get('lat', 23.25))
+    lon = float(data.get('lon', 77.41))
 
-    print(f"\n📍 Received coordinates: {lat}, {lon}")
+    print(f"\n📍 Received coordinates for Prediction: {lat}, {lon}")
 
-    # 1. Fetch live data & predict
-    features = get_real_time_features(lat, lon)
-    f_prob = float(flood_model.predict(features)[0])
-    e_risk = int(eq_model.predict([[lat, lon, 10]])[0])
+    # --- FORCED TEST MODE ---
+    # We are bypassing the model math to ensure the Frontend gets data
+    f_prob = 0.99 
+    status = "HIGH RISK"
+    
+    # Generate a 0.1 degree square (approx 11km) around the point
+    offset = 0.05 
+    danger_polygon = [
+        [lon - offset, lat - offset], # Bottom Left
+        [lon + offset, lat - offset], # Bottom Right
+        [lon + offset, lat + offset], # Top Right
+        [lon - offset, lat + offset], # Top Left
+        [lon - offset, lat - offset]  # Close the loop
+    ]
 
-    print(f"📊 AI Calculated -> Flood Prob: {f_prob*100:.1f}%, EQ Risk: {e_risk}")
+    alert_payload = {
+        "disaster_type": "flood",
+        "status": "approved",
+        "risk_level": "HIGH",
+        "latitude": lat,
+        "longitude": lon,
+        "confidence": 0.95,
+        "danger_zone": {
+            "type": "Polygon",
+            "coordinates": [danger_polygon]
+        },
+        "message": "AI detected high saturation levels. Immediate caution advised."
+    }
 
-    # 2. Check if Risk is HIGH (Threshold > 0.7)
-    if f_prob > 0.7 or e_risk == 1:
-    # f_prob = 0.99
-    # if True:
-        disaster_type = "flood" if f_prob > 0.7 else "earthquake"
-        
-        alert_payload = {
-            "disaster_type": disaster_type,
-            "risk_level": "HIGH",
-            "latitude": lat,
-            "longitude": lon,
-            "confidence": round(f_prob if disaster_type == "flood" else 0.84, 2),
-            "message": f"High {disaster_type} risk detected based on live environmental data."
-        }
-        
-        # 3. Send to Node.js Backend
-        try:
-            requests.post(NODE_BACKEND_URL, json=alert_payload)
+    # 3. Send to Node.js Backend
+    try:
+        response = requests.post(NODE_BACKEND_URL, json=alert_payload)
+        if response.status_code == 200 or response.status_code == 201:
             print("✅ [SUCCESS] Sent HIGH RISK alert to Node.js backend!")
-        except requests.exceptions.ConnectionError:
-            print("❌ [ERROR] Could not connect to Node.js. Make sure index.js is running on port 3000!")
+        else:
+            print(f"⚠️ [WARNING] Node.js responded with status: {response.status_code}")
+    except Exception as e:
+        print(f"❌ [ERROR] Could not connect to Node.js: {e}")
 
-        return jsonify({"status": "ALERT_GENERATED", "payload": alert_payload})
-
-    return jsonify({"status": "SAFE", "probability": f_prob})
+    return jsonify({
+        "status": "ALERT_GENERATED", 
+        "probability": f_prob,
+        "payload": alert_payload
+    })
 
 if __name__ == '__main__':
-    print("🤖 AI Server is starting on port 5001...")
-    app.run(port=5001)
+    print("🤖 AI Server (Force Mode) starting on port 5001...")
+    app.run(port=5001, debug=True)

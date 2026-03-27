@@ -129,7 +129,7 @@ export const CommunitySection = () => {
               {chats.length === 0 ? (
                 <p className="text-center text-muted-foreground mt-10">Loading chats...</p>
               ) : (
-                chats.map((chat) => (
+                (Array.isArray(chats) ? chats : []).map((chat) => (
                   <div key={chat.id} className="flex gap-4 p-4 bg-background rounded-2xl shadow-sm border border-border/50">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                       <Users className="h-5 w-5 text-primary" />
