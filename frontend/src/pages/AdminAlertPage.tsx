@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast"; // Adjust path if your toast hook is elsewhere
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast"; 
+import { Camera } from "lucide-react"; 
 import axios from 'axios';
 
 interface Alert {
@@ -20,7 +22,6 @@ const AdminAlertPage = () => {
 
     const fetchAlerts = async () => {
         try {
-            // Adjust port if your backend runs on something other than 5000
             const res = await axios.get('http://localhost:5000/api/alerts/pending');
             setAlerts(res.data);
         } catch (err) {
@@ -44,7 +45,7 @@ const AdminAlertPage = () => {
                 title: "Success",
                 description: "Alert Approved & SMS Broadcasted!",
             });
-            fetchAlerts(); // Refresh the list
+            fetchAlerts(); 
         } catch (err) {
             toast({
                 title: "Error",
@@ -55,10 +56,56 @@ const AdminAlertPage = () => {
     };
 
     return (
-        <div className="container mx-auto p-6 max-w-4xl">
-            <h1 className="text-3xl font-bold mb-6 text-red-600">🚨 Admin Disaster Approval Panel</h1>
-            <p className="mb-6 text-muted-foreground">Review and approve AI-generated alerts before broadcasting them to users.</p>
+        <div className="container mx-auto p-6 max-w-5xl">
             
+            {/* --- TOP HEADER (Title Left, Button Right) --- */}
+            <div className="flex justify-between items-center mb-8">
+                
+                {/* Left Side: Title & Description */}
+                <div>
+                    <h1 className="text-3xl font-bold mb-2 text-red-600">🚨 Admin Disaster Approval Panel</h1>
+                    <p className="text-muted-foreground">Review and approve AI-generated alerts before broadcasting them to users.</p>
+                </div>
+
+                {/* Right Side: The Modal Button */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-2 px-6">
+                            <Camera size={20} />
+                            Open Live AI Camera
+                        </Button>
+                    </DialogTrigger>
+                    
+                    {/* --- THE BIG MODAL --- */}
+                    {/* The X (cut) button is automatically added by shadcn/ui to the top right of this DialogContent */}
+                    <DialogContent className="max-w-5xl bg-black border-gray-800 p-4">
+                        <DialogHeader>
+                            <DialogTitle className="text-white flex items-center gap-2 mb-2">
+                                <span className="relative flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                LIVE: Rescue Camera Feed
+                            </DialogTitle>
+                        </DialogHeader>
+                        
+                        {/* The AI Video Feed */}
+                        <div className="w-full aspect-video bg-gray-900 rounded-md overflow-hidden flex items-center justify-center border border-gray-700">
+                            <img 
+                                src="http://127.0.0.1:5000/video_feed" 
+                                alt="Live AI Feed" 
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-white text-lg">Camera Offline. Start cv_server.py</span>');
+                                }}
+                            />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            {/* --- ALERTS SECTION --- */}
             {alerts.length === 0 ? (
                 <Card className="bg-muted/50">
                     <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
