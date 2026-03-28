@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AddResource from "./AddResource";
 import ReportEmergency from "./ReportEmergency";
+import React, { useEffect, useState } from "react";
 
 import {
   Zap,
@@ -9,13 +10,12 @@ import {
   X 
 } from "lucide-react";
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polygon } from "react-leaflet";
 import L from "leaflet";
-import { useEffect, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import "./MapStyles.css";
 
-// Fix leaflet default icon bug
+// Fix Leaflet marker icon path issues
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -23,6 +23,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png"
 });
 
+// --- Interfaces ---
 interface Resource {
   id: number;
   name: string;
@@ -36,6 +37,20 @@ interface Resource {
   };
 }
 
+interface Alert {
+  id: number;
+  disaster_type: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  message: string;
+  danger_zone: {
+    type: string;
+    coordinates: number[][][]; // GeoJSON nested array format
+  };
+}
+
+// Helper to center map
 const RecenterMap = ({ lat, lng }: { lat: number; lng: number }) => {
   const map = useMap();
   useEffect(() => {
@@ -53,34 +68,52 @@ const userLocationIcon = L.divIcon({
 
 export const MapSection = () => {
   const [resources, setResources] = useState<Resource[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [userLocation, setUserLocation] = useState<[number, number]>([28.6139, 77.209]);
+  const [userLocation, setUserLocation] = useState<[number, number]>([23.25, 77.41]); // Default to Kothri Kalan area
 
+  // 1. Get User Location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation([position.coords.latitude, position.coords.longitude]);
         },
-        (error) => console.error("Error getting user location:", error)
+        (error) => console.error("Geolocation error:", error)
       );
     }
   }, []);
 
+  // 2. Fetch Resources
   const fetchResources = async () => {
     try {
       const res = await fetch("http://localhost:5000/api/resources");
       const data = await res.json();
       setResources(data);
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("Resource fetch error:", err);
+    }
+  };
+
+  // 3. Fetch Alerts (Crucial: Matches Backend Route)
+  const fetchAlerts = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/alerts/active"); 
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setAlerts(data);
+        console.log("✅ Alerts successfully loaded:", data);
+      }
+    } catch (err) {
+      console.error("Alert fetch error:", err);
     }
   };
 
   useEffect(() => {
     fetchResources();
+    fetchAlerts();
   }, []);
 
   const handleResourceSubmit = async (resourceData: any) => {
@@ -94,110 +127,131 @@ export const MapSection = () => {
   };
 
   return (
-    <>
-      <section id="map" className="pt-6 pb-16 lg:pt-8 lg:pb-24 bg-muted/30 relative">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">Interactive Resource Map</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Explore resources near you with our real-time mapping system.
-            </p>
+    <section id="map" className="pt-6 pb-16 lg:pt-8 lg:pb-24 bg-muted/30 relative">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold mb-2">Real-Time Hazard Map</h2>
+          <p className="text-muted-foreground">Showing verified resources and AI-detected risk zones.</p>
+        </div>
+
+        <div className="grid lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3">
+            <Card className="p-1 border-2 border-primary/10 shadow-lg">
+              <div className="rounded-lg overflow-hidden h-[600px] relative">
+                <MapContainer
+                  center={userLocation}
+                  zoom={12}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <RecenterMap lat={userLocation[0]} lng={userLocation[1]} />
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+                  {/* User Position */}
+                  <Marker position={userLocation} icon={userLocationIcon}>
+                     <Popup>You are here</Popup>
+                  </Marker>
+
+                  {/* Rendering Resources */}
+                  {resources.map((res) => {
+                    if (!res.location?.coordinates) return null;
+                    const [lng, lat] = res.location.coordinates;
+                    return (
+                      <Marker 
+                        key={`res-${res.id}`} 
+                        position={[lat, lng]}
+                        eventHandlers={{ click: () => setSelectedResource(res) }}
+                      >
+                        <Popup>
+                          <strong>{res.name}</strong><br />{res.type}
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
+
+                  {/* RENDERING DISASTER POLYGONS */}
+                  {alerts.map((alert) => {
+                    if (!alert.danger_zone?.coordinates) return null;
+                    
+                    // Convert GeoJSON [lon, lat] to Leaflet [lat, lon]
+                    const leafletCoords: [number, number][] = alert.danger_zone.coordinates[0].map(
+                      (coord) => [coord[1], coord[0]]
+                    );
+                    
+                    const zoneColor = alert.disaster_type === 'flood' ? '#3b82f6' : '#ef4444';
+
+                    return (
+                      <React.Fragment key={`frag-${alert.id}`}>
+                        {/* Center Marker for the Alert */}
+                        <Marker position={[Number(alert.latitude), Number(alert.longitude)]}>
+                           <Popup>
+                              <strong className="text-red-600">🚨 {alert.disaster_type.toUpperCase()}</strong><br/>
+                              {alert.message}
+                           </Popup>
+                        </Marker>
+
+                        {/* The Actual Shape */}
+                        <Polygon 
+                          positions={leafletCoords}
+                          pathOptions={{ 
+                            color: zoneColor, 
+                            fillColor: zoneColor, 
+                            fillOpacity: 0.35,
+                            weight: 3
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+                </MapContainer>
+
+                {/* Info Card Overlay */}
+                {selectedResource && (
+                  <div className="absolute bottom-6 left-6 z-[1000] w-80">
+                    <Card className="p-4 shadow-2xl border-l-4 border-blue-600 bg-white/95 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg">{selectedResource.name}</h3>
+                        <button onClick={() => setSelectedResource(null)} className="text-gray-400 hover:text-red-500">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold text-blue-600 uppercase mb-2">{selectedResource.type}</p>
+                      <p className="text-sm text-gray-600 mb-4">{selectedResource.description}</p>
+                      <div className="space-y-1 text-sm bg-muted p-2 rounded">
+                        <p>📞 {selectedResource.contact_number}</p>
+                        <p>✅ Status: <span className="text-green-600 font-bold">{selectedResource.status}</span></p>
+                      </div>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
 
-          <div className="grid lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3">
-              <Card className="p-1">
-                <div className="rounded-lg overflow-hidden h-96 lg:h-[600px] relative">
-                  <MapContainer
-                    center={userLocation}
-                    zoom={13}
-                    style={{ height: "100%", width: "100%" }}
-                  >
-                    <RecenterMap lat={userLocation[0]} lng={userLocation[1]} />
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
-                    <Marker position={userLocation} icon={userLocationIcon}>
-                       <Popup>You are here</Popup>
-                    </Marker>
-
-                    {resources.map((res) => {
-                      if (!res.location || !res.location.coordinates) return null;
-                      const [lng, lat] = res.location.coordinates;
-                      return (
-                        <Marker 
-                          key={res.id} 
-                          position={[lat, lng]}
-                          eventHandlers={{ click: () => setSelectedResource(res) }}
-                        >
-                          <Popup>
-                            <strong>{res.name}</strong><br />{res.type}
-                          </Popup>
-                        </Marker>
-                      );
-                    })}
-                  </MapContainer>
-
-                  {selectedResource && (
-                    <div className="absolute bottom-4 left-4 z-[1000] w-72 animate-in slide-in-from-bottom-5">
-                      <Card className="p-4 shadow-2xl border-l-4 border-blue-600 bg-white/95 backdrop-blur-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold bg-white text-black">{selectedResource.name}</h3>
-                          <button onClick={() => setSelectedResource(null)} className="text-gray-400 hover:text-black">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <p className="text-xs text-blue-600 font-semibold mb-2 uppercase">{selectedResource.type}</p>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-3">{selectedResource.description}</p>
-                        <div className="flex flex-col gap-1 text-xs bg-muted/50 p-2 rounded">
-                          <span className="flex items-center gap-2">📞 {selectedResource.contact_number}</span>
-                          <span className="flex items-center gap-2">📍 Status: <span className="text-green-600 font-bold">{selectedResource.status}</span></span>
-                        </div>
-                      </Card>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Card className="p-4">
-                <h4 className="font-semibold mb-3">Quick Actions</h4>
-                <div className="space-y-2">
-                  <Button
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setShowModal(true)}
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Report Resource
-                  </Button>
-                  
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="w-full justify-start bg-red-600 hover:bg-red-700 text-white"
-                    onClick={() => setShowEmergencyModal(true)}
-                  >
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Report Emergency
-                  </Button>
-                </div>
-              </Card>
-            </div>
+          {/* Sidebar Controls */}
+          <div className="space-y-4">
+            <Card className="p-4 bg-white/50 backdrop-blur">
+              <h4 className="font-bold mb-4 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500" /> Control Panel
+              </h4>
+              <div className="flex flex-col gap-3">
+                <Button className="w-full" onClick={() => setShowModal(true)}>
+                  <Zap className="h-4 w-4 mr-2" /> Register Resource
+                </Button>
+                <Button variant="destructive" className="w-full" onClick={() => setShowEmergencyModal(true)}>
+                  <AlertTriangle className="h-4 w-4 mr-2" /> SOS Emergency
+                </Button>
+                <hr className="my-2"/>
+                <Button variant="outline" className="w-full" onClick={() => { fetchAlerts(); fetchResources(); }}>
+                  🔄 Refresh Map Data
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
-      </section>
+      </div>
 
-      <AddResource
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onSubmit={handleResourceSubmit}
-      />
-
-      <ReportEmergency 
-        isOpen={showEmergencyModal} 
-        onClose={() => setShowEmergencyModal(false)} 
-      />
-    </>
+      <AddResource isOpen={showModal} onClose={() => setShowModal(false)} onSubmit={handleResourceSubmit} />
+      <ReportEmergency isOpen={showEmergencyModal} onClose={() => setShowEmergencyModal(false)} />
+    </section>
   );
 };
