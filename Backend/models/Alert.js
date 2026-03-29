@@ -11,6 +11,7 @@ const createAlertTable = async () => {
             confidence FLOAT,
             message TEXT,
             status VARCHAR(50) DEFAULT 'pending',
+            danger_zone JSONB, -- ✅ ADDED THIS FOR THE POLYGONS!
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `;

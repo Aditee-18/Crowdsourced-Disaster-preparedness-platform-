@@ -52,7 +52,7 @@ export const EmergencyAlerts = () => {
           };
         });
 
-        setAlerts(formattedAlerts);
+        setAlerts(formattedAlerts.slice(0,3));
       } catch (error) {
         console.error("Failed to fetch alerts:", error);
       } finally {

@@ -209,7 +209,7 @@ export const MapSection = () => {
                   <div className="absolute bottom-6 left-6 z-[1000] w-80">
                     <Card className="p-4 shadow-2xl border-l-4 border-blue-600 bg-white/95 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-lg">{selectedResource.name}</h3>
+                        <h3 className="font-bold text-black bg-white">{selectedResource.name}</h3>
                         <button onClick={() => setSelectedResource(null)} className="text-gray-400 hover:text-red-500">
                           <X className="h-5 w-5" />
                         </button>
@@ -229,7 +229,7 @@ export const MapSection = () => {
 
           {/* Sidebar Controls */}
           <div className="space-y-4">
-            <Card className="p-4 bg-white/50 backdrop-blur">
+            <Card className="p-4">
               <h4 className="font-bold mb-4 flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-orange-500" /> Control Panel
               </h4>
@@ -238,11 +238,7 @@ export const MapSection = () => {
                   <Zap className="h-4 w-4 mr-2" /> Register Resource
                 </Button>
                 <Button variant="destructive" className="w-full" onClick={() => setShowEmergencyModal(true)}>
-                  <AlertTriangle className="h-4 w-4 mr-2" /> SOS Emergency
-                </Button>
-                <hr className="my-2"/>
-                <Button variant="outline" className="w-full" onClick={() => { fetchAlerts(); fetchResources(); }}>
-                  🔄 Refresh Map Data
+                  <AlertTriangle className="h-4 w-4 mr-2" /> Report Emergency
                 </Button>
               </div>
             </Card>

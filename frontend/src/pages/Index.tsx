@@ -11,9 +11,9 @@ const Index = () => {
       <Header />
       <main>
         <MapSection />
-        <ResourceCategories />
         <EmergencyAlerts />
         <CommunitySection />
+        <ResourceCategories />
         
       </main>
       <Footer />

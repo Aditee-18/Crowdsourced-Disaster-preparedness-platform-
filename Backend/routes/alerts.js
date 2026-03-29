@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db'); 
 
 // 1. RECEIVE FROM AI SERVER (Saves with Polygon and Auto-Approves)
+// ⚠️ UNTOUCHED: Kept exactly as your team member wrote it
 router.post('/receive-ai', async (req, res) => {
     try {
         // Destructure danger_zone from the AI's JSON payload
@@ -39,15 +40,24 @@ router.post('/receive-ai', async (req, res) => {
 router.post('/report', async (req, res) => {
     const { disaster_type, description, latitude, longitude } = req.body;
     try {
+        // ✅ We completely removed danger_zone from this query.
+        // Postgres will automatically just leave it blank for manual reports!
         const query = `
-            INSERT INTO alerts (disaster_type, message, latitude, longitude, status)
-            VALUES ($1, $2, $3, $4, 'pending')
+            INSERT INTO alerts (disaster_type, message, latitude, longitude, status, risk_level, confidence)
+            VALUES ($1, $2, $3, $4, 'pending', 'MEDIUM', 1.0)
             RETURNING id;
         `;
-        const result = await db.query(query, [disaster_type, description, latitude, longitude]);
+        
+        const result = await db.query(query, [
+            disaster_type, 
+            description, 
+            latitude, 
+            longitude
+        ]);
+        
         res.status(201).json({ success: true, alertId: result.rows[0].id });
     } catch (err) {
-        console.error("❌ Report Error:", err);
+        console.error("❌ Report Error:", err.message);
         res.status(500).json({ error: "Failed to save report" });
     }
 });
