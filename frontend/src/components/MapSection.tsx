@@ -7,7 +7,8 @@ import React, { useEffect, useState } from "react";
 import {
   Zap,
   AlertTriangle,
-  X 
+  X,
+  Trash2
 } from "lucide-react";
 
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polygon } from "react-leaflet";
@@ -44,9 +45,9 @@ interface Alert {
   latitude: number;
   longitude: number;
   message: string;
-  danger_zone: {
+  danger_zone?: { 
     type: string;
-    coordinates: number[][][]; // GeoJSON nested array format
+    coordinates: number[][][]; 
   };
 }
 
@@ -59,6 +60,7 @@ const RecenterMap = ({ lat, lng }: { lat: number; lng: number }) => {
   return null;
 };
 
+// Your live location red dot
 const userLocationIcon = L.divIcon({
   className: 'custom-location-marker',
   html: '<div class="my-red-dot"></div>',
@@ -72,7 +74,7 @@ export const MapSection = () => {
   const [showModal, setShowModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [userLocation, setUserLocation] = useState<[number, number]>([23.25, 77.41]); // Default to Kothri Kalan area
+  const [userLocation, setUserLocation] = useState<[number, number]>([23.25, 77.41]); 
 
   // 1. Get User Location
   useEffect(() => {
@@ -97,14 +99,13 @@ export const MapSection = () => {
     }
   };
 
-  // 3. Fetch Alerts (Crucial: Matches Backend Route)
+  // 3. Fetch Alerts
   const fetchAlerts = async () => {
     try {
       const res = await fetch("http://localhost:5000/api/alerts/active"); 
       const data = await res.json();
       if (Array.isArray(data)) {
         setAlerts(data);
-        console.log("✅ Alerts successfully loaded:", data);
       }
     } catch (err) {
       console.error("Alert fetch error:", err);
@@ -124,6 +125,11 @@ export const MapSection = () => {
     });
     fetchResources();
     setShowModal(false);
+  };
+
+  // Function to instantly wipe polygons from the screen for presentations
+  const handleClearDemo = () => {
+    setAlerts(alerts.filter(alert => !alert.danger_zone));
   };
 
   return (
@@ -146,12 +152,12 @@ export const MapSection = () => {
                   <RecenterMap lat={userLocation[0]} lng={userLocation[1]} />
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                  {/* User Position */}
+                  {/* ONLY RED DOT ON THE MAP: User Position */}
                   <Marker position={userLocation} icon={userLocationIcon}>
                      <Popup>You are here</Popup>
                   </Marker>
 
-                  {/* Rendering Resources */}
+                  {/* Rendering Resources (Standard Pins) */}
                   {resources.map((res) => {
                     if (!res.location?.coordinates) return null;
                     const [lng, lat] = res.location.coordinates;
@@ -168,38 +174,30 @@ export const MapSection = () => {
                     );
                   })}
 
-                  {/* RENDERING DISASTER POLYGONS */}
+                  {/* RENDERING ONLY AI POLYGONS (Ignores citizen reports entirely) */}
                   {alerts.map((alert) => {
-                    if (!alert.danger_zone?.coordinates) return null;
+                    const zoneColor = alert.disaster_type === 'flood' ? '#3b82f6' : '#ef4444';
+                    const hasPolygon = Boolean(alert.danger_zone?.coordinates && alert.danger_zone.coordinates.length > 0);
                     
-                    // Convert GeoJSON [lon, lat] to Leaflet [lat, lon]
-                    const leafletCoords: [number, number][] = alert.danger_zone.coordinates[0].map(
-                      (coord) => [coord[1], coord[0]]
+                    // If it is a citizen report with no polygon, draw absolutely nothing.
+                    if (!hasPolygon) return null;
+
+                    // If it is an AI alert, draw the polygon.
+                    const leafletCoords = alert.danger_zone!.coordinates[0].map(
+                      (coord: any) => [coord[1], coord[0]] as [number, number]
                     );
                     
-                    const zoneColor = alert.disaster_type === 'flood' ? '#3b82f6' : '#ef4444';
-
                     return (
-                      <React.Fragment key={`frag-${alert.id}`}>
-                        {/* Center Marker for the Alert */}
-                        <Marker position={[Number(alert.latitude), Number(alert.longitude)]}>
-                           <Popup>
-                              <strong className="text-red-600">🚨 {alert.disaster_type.toUpperCase()}</strong><br/>
-                              {alert.message}
-                           </Popup>
-                        </Marker>
-
-                        {/* The Actual Shape */}
-                        <Polygon 
-                          positions={leafletCoords}
-                          pathOptions={{ 
-                            color: zoneColor, 
-                            fillColor: zoneColor, 
-                            fillOpacity: 0.35,
-                            weight: 3
-                          }}
-                        />
-                      </React.Fragment>
+                      <Polygon 
+                        key={`poly-${alert.id}`}
+                        positions={leafletCoords}
+                        pathOptions={{ color: zoneColor, fillColor: zoneColor, fillOpacity: 0.35, weight: 3 }}
+                      >
+                         <Popup>
+                            <strong className="text-red-600">🚨 AI WARNING: {alert.disaster_type?.toUpperCase()}</strong><br/>
+                            {alert.message}
+                         </Popup>
+                      </Polygon>
                     );
                   })}
                 </MapContainer>
@@ -239,6 +237,10 @@ export const MapSection = () => {
                 </Button>
                 <Button variant="destructive" className="w-full" onClick={() => setShowEmergencyModal(true)}>
                   <AlertTriangle className="h-4 w-4 mr-2" /> Report Emergency
+                </Button>
+                {/* Presentation Demo Button */}
+                <Button variant="outline" className="w-full mt-2 border-dashed border-2" onClick={handleClearDemo}>
+                  <Trash2 className="h-4 w-4 mr-2 text-gray-500" /> Clear AI Demo
                 </Button>
               </div>
             </Card>
