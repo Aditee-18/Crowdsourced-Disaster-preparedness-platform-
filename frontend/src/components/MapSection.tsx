@@ -238,10 +238,8 @@ export const MapSection = () => {
                 <Button variant="destructive" className="w-full" onClick={() => setShowEmergencyModal(true)}>
                   <AlertTriangle className="h-4 w-4 mr-2" /> Report Emergency
                 </Button>
-                {/* Presentation Demo Button */}
-                <Button variant="outline" className="w-full mt-2 border-dashed border-2" onClick={handleClearDemo}>
-                  <Trash2 className="h-4 w-4 mr-2 text-gray-500" /> Clear AI Demo
-                </Button>
+               
+               
               </div>
             </Card>
           </div>

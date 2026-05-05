@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db'); 
 
 // 1. RECEIVE FROM AI SERVER (Saves with Polygon and Auto-Approves)
-// ⚠️ UNTOUCHED: Kept exactly as your team member wrote it
 router.post('/receive-ai', async (req, res) => {
     try {
         // Destructure danger_zone from the AI's JSON payload
